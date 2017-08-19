@@ -1,5 +1,8 @@
 Log File Monitoring
 
+Install Dependencies :
+
+`npm install`
 
 To run the server :
 
