@@ -8,10 +8,13 @@ To run the server :
 
 `npm start`
 
-To write junk log data
+To write junk to log files:
 
+`node writeJunk.js [path-to-file]`
 
-`npm run write:log`
+eg:
+
+`node writeJunk.js logs/loga.txt`
 
 Open in browser 
 

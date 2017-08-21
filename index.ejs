@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+</head>
+
+<body>
+    <h3 class="text-center">Log Monitor</h3>
+    <div class="row">
+        <div class="col-lg-12">
+            <h4>Available Files</h4>
+            <% for(var i =0 ; i < files.length;i++){ %>
+                <span style="background:lightblue;padding:2px 4px;border-radius:2px;margin-right:2px"><%= files[i] %> </span> 
+
+            <% } %>
+
+            <p class="text-center">Type in the name of the file , you want to monitor</p>
+        </div>
+        
+    </div>
+    <div class="row">
+        <div class="col-lg-4 col-lg-offset-4">
+            <div class="input-group">
+                <input type="text" id="filename" class="form-control" placeholder="Enter File Name">
+                <span class="input-group-addon" onclick="showLogs()" style="cursor:pointer">
+                    Show logs
+                </span>
+            </div>
+        </div>
+    </div>
+    <br>
+    <pre id="logs"></pre>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        var socket = io();
+        var pre = document.getElementById('logs');
+        var input = document.getElementById('filename');
+        var currentState = [];
+        function showLogs() {
+            var filename = input.value;
+            socket.emit('filename', filename);
+        }
+
+        socket.on('fileerror', function (error) {
+            pre.innerHTML = error;
+        });
+
+        socket.on('log', function (data) {
+            console.log(data);
+            currentState = data.logs;
+            pre.innerHTML = data.logs.join('\n');
+        });
+
+        socket.on('loglines', function (lines) {
+            currentState = currentState.concat(lines);
+            while (currentState.length > 10) {
+                currentState.shift();
+            }
+            pre.innerHTML = currentState.join('\n');
+            console.log(currentState);
+
+        });
+    </script>
+</body>
+
+</html>

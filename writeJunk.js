@@ -1,10 +1,10 @@
 var fs = require('fs');
-
+var path = require('path');
 
 function getRandomCharCode(min, max) {
     return Math.random() * (max - min) + min;
 }
-
+var intervalId;
 
 function generateString() {
     var line = "";
@@ -15,12 +15,18 @@ function generateString() {
         charCode = Math.round(getRandomCharCode(97, 122));
         line += String.fromCharCode(charCode);
     }
+    if (!process.argv[2]) {
+        clearInterval(intervalId);
+        return;
+    }
 
-    fs.appendFile("file.txt", line + "\n", function (err) {
+    var exactPath = path.resolve(__dirname, process.argv[2]);
+    fs.appendFile(process.argv[2], line + "\n", function (err) {
         if (err) {
+            clearInterval(intervalId);
             console.log(err);
         }
     });
 }
 
-setInterval(generateString, 1000);
+intervalId = setInterval(generateString, 1000);
