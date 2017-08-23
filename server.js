@@ -8,7 +8,8 @@ var readFromPosition = require('./read.js').readFromPosition;
 
 var fs = require('fs');
 var path = require('path');
-
+var _ = require('underscore');
+var touch = require('touch');
 
 app.set('view engine', 'ejs');
 
@@ -54,12 +55,23 @@ function attachEmitLogs(socket, filename) {
         stats = fs.statSync(exactPath);
         fd = fs.openSync(exactPath, 'r');
     } catch (e) {
-        return socket.emit('fileerror', 'File does not exist');
+        touch(exactPath, function (err) {
+            stats = fs.statSync(exactPath);
+            fd = fs.openSync(exactPath, 'r');
+            tailFile(fd, stats.size, function (err, lastLinesList) {
+                currentState = lastLinesList;
+                socket.emit(filename + 'log', { logs: lastLinesList, date: new Date() });
+                attachWatcher(socket, exactPath, fd, stats.size, currentState);
+            });
+        });
+
+        return;
+
     }
 
     tailFile(fd, stats.size, function (err, lastLinesList) {
         currentState = lastLinesList;
-        socket.emit('log', { logs: lastLinesList, date: new Date() });
+        socket.emit(filename + 'log', { logs: lastLinesList, date: new Date() });
         attachWatcher(socket, exactPath, fd, stats.size, currentState);
     });
 }
@@ -67,87 +79,37 @@ function attachEmitLogs(socket, filename) {
 
 function attachWatcher(socket, filename, fd, size, currentState) {
 
-    fs.watchFile(filename, function (currStats, prevState) {
-        if (currStats.size !== size) {
-            readNextNLines(fd, size, currStats.size, function (err, linesArray) {
-                socket.emit('loglines', linesArray);
+    function update(eventType, filename) {
+        var currStats = fs.fstatSync(fd);
+        if (currStats.size > 0 && currStats.size != size) {
+
+            readNextChunk(fd, size, currStats.size, function (err, newLines) {
+                socket.emit(filename + 'loglines', newLines.trim().split('\n'));
             });
+            size = currStats.size;
         }
 
-
-        size = currStats.size;
-    });
-}
-
-
-function readNextNLines(fd, start, currSize, callback) {
-
-
-
-    (function (fd, start, currSize, callback) {
-        var line = '';
-        var linesArray = [];
-        function append(err, char) {
-            if (err) {
-                return callback(err);
-            }
-
-            if (start == currSize) {
-                line.length > 0 ? linesArray.push(line) : '';
-                line = '';
-                return callback(null, linesArray);
-            }
-
-            if (char == '\n' || char == '\r') {
-                // if (char == '\r') {
-                //     console.log('Carriage Return and Lines are:' + line.length);
-                // }
-
-                // if (char == '\n') {
-                //     console.log('New Line and line are:' + line.length);
-                // }
-
-
-                if (linesArray.length == 0 && line.length == 0) {
-                    // do  nothing
-                } else {
-                    if (line.length > 0) linesArray.push(line);
-                    line = '';
-                }
-            } else {
-                line = line + char;
-            }
-
-            start++;
-            readFromPosition(fd, start, append);
-        }
-
-        readFromPosition(fd, start, append);
-    })(fd, start, currSize, callback);
-
+    }
+    var throttled = _.throttle(update, 200);
+    fs.watch(filename, throttled);
 
 }
 
 
+function readNextChunk(fd, start, currSize, callback) {
 
-function tailFileWatch(filename) {
-    var fd = fs.openSync(filename, 'r');
-    var stats = fs.statSync(filename);
-    tailFile(fd, stats.size, function (err, lastLines) {
-        currentLogState = lastLines;
-        io.emit('log', { log: lastLines, date: new Date() });
-    });
-
-    var fsWatcher = fs.watchFile(filename, function (curr, prev) {
-        tailFile(fd, curr.size, function (err, lastLines) {
-            currentLogState = lastLines;
-            io.emit('log', { logs: lastLines, date: new Date() });
-        });
+    var totalSize = currSize - start;
+    var buffer = new Buffer(totalSize);
+    fs.read(fd, buffer, 0, totalSize, start, function (err, bytesRead, buffer) {
+        callback(null, buffer.toString('utf-8'))
     });
 }
 
 
-tailFileWatch("file.txt");
+
+
+
+
 
 
 

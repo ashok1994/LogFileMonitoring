@@ -13,11 +13,7 @@
     <h3 class="text-center">Log Monitor</h3>
     <div class="row">
         <div class="col-lg-12">
-            <h4>Available Files</h4>
-            <% for(var i =0 ; i < files.length;i++){ %>
-                <span style="background:lightblue;padding:2px 4px;border-radius:2px;margin-right:2px"><%= files[i] %> </span> 
-
-            <% } %>
+         
 
             <p class="text-center">Type in the name of the file , you want to monitor</p>
         </div>
@@ -41,30 +37,47 @@
         var pre = document.getElementById('logs');
         var input = document.getElementById('filename');
         var currentState = [];
+        var oldFileName = '';
         function showLogs() {
             var filename = input.value;
+            if(oldFileName){
+                removeListeners(socket, oldFileName);
+            }
+            oldFileName = filename;
+            currentState = [];
             socket.emit('filename', filename);
+            attachNewListeners(socket, filename);
+        }
+
+
+       function newData(data) {
+            currentState = data.logs;
+            pre.innerHTML = data.logs.join('\n');
+        }
+
+        function newLines(lines){
+            currentState = currentState.concat(lines);
+            while (currentState.length > 10) {
+                currentState.shift();
+            }
+            pre.innerHTML = currentState.join('\n');
+        }
+
+        function attachNewListeners(socket, filename){
+            socket.on(filename+'log', newData);
+            socket.on(filename+'loglines', newLines);
+        }
+
+        function removeListeners(socket, filename){
+            socket.removeEventListener(filename+'log', newData);
+            socket.removeEventListener(filename+'loglines', newLines);
         }
 
         socket.on('fileerror', function (error) {
             pre.innerHTML = error;
         });
 
-        socket.on('log', function (data) {
-            console.log(data);
-            currentState = data.logs;
-            pre.innerHTML = data.logs.join('\n');
-        });
-
-        socket.on('loglines', function (lines) {
-            currentState = currentState.concat(lines);
-            while (currentState.length > 10) {
-                currentState.shift();
-            }
-            pre.innerHTML = currentState.join('\n');
-            console.log(currentState);
-
-        });
+       
     </script>
 </body>
 
