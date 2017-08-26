@@ -13,6 +13,8 @@ var touch = require('touch');
 
 app.set('view engine', 'ejs');
 
+var fdMemo = {};
+
 app.get('/', function (req, res) {
     fs.readdir(path.resolve(__dirname, 'logs'), function (err, files) {
         if (err) {
@@ -52,12 +54,19 @@ function attachEmitLogs(socket, filename) {
     var currentState = [];
     var exactPath = path.resolve(__dirname, 'logs', filename);
     try {
-        stats = fs.statSync(exactPath);
-        fd = fs.openSync(exactPath, 'r');
+        if (getFd(exactPath)) {
+            fd = getFd(exactPath);
+            console.log('Hit');
+        } else {
+            fd = fs.openSync(exactPath, 'r');
+            saveFd(exactPath, fd);
+        }
+        stats = fs.fstatSync(fd);
     } catch (e) {
         touch(exactPath, function (err) {
             stats = fs.statSync(exactPath);
             fd = fs.openSync(exactPath, 'r');
+            saveFd(exactPath, fd);
             tailFile(fd, stats.size, function (err, lastLinesList) {
                 currentState = lastLinesList;
                 socket.emit(filename + 'log', { logs: lastLinesList, date: new Date() });
@@ -105,8 +114,14 @@ function readNextChunk(fd, start, currSize, callback) {
     });
 }
 
+// Util Functions
+function saveFd(fullPath, fd) {
+    fdMemo[fullPath] = fd;
+}
 
-
+function getFd(fullPath) {
+    return fdMemo[fullPath];
+}
 
 
 
